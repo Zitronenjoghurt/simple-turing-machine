@@ -1,3 +1,7 @@
+use std::error::Error;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TuringTape {
     tape: Vec<u8>,
     size_bytes: usize,
@@ -11,7 +15,7 @@ impl TuringTape {
         }
     }
 
-    fn get_byte_index_and_position(&self, bit_index: usize) -> Result<(usize, usize), Box<dyn std::error::Error>> {
+    fn get_byte_index_and_position(&self, bit_index: usize) -> Result<(usize, usize), Box<dyn Error>> {
         let byte_index = bit_index / 8;
         if byte_index >= self.size_bytes {
             return Err(format!("Bit index '{}' out of range for '{}' bytes", bit_index, self.size_bytes).into());
@@ -21,20 +25,20 @@ impl TuringTape {
         Ok((byte_index, position))
     }
 
-    pub fn read(&self, bit_index: usize) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn read(&self, bit_index: usize) -> Result<bool, Box<dyn Error>> {
         let (byte_index, position) = self.get_byte_index_and_position(bit_index)?;
         let byte = self.tape[byte_index];
         Ok((byte & (1 << position)) != 0)
     }
 
-    pub fn set(&mut self, bit_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn set(&mut self, bit_index: usize) -> Result<(), Box<dyn Error>> {
         let (byte_index, position) = self.get_byte_index_and_position(bit_index)?;
         let byte = &mut self.tape[byte_index];
         *byte |= 1 << position;
         Ok(())
     }
 
-    pub fn unset(&mut self, bit_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn unset(&mut self, bit_index: usize) -> Result<(), Box<dyn Error>> {
         let (byte_index, position) = self.get_byte_index_and_position(bit_index)?;
         let byte = &mut self.tape[byte_index];
         *byte &= !(1 << position);
