@@ -3,6 +3,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use crate::enums::movement::Movement;
 use crate::machine::instruction::Instruction;
+use crate::machine::state::State;
 use crate::machine::turing_program::TuringProgram;
 use crate::machine::turing_tape::TuringTape;
 
@@ -11,7 +12,7 @@ pub struct TuringMachine {
     tape: TuringTape,
     head: usize,
     head_max: usize,
-    state: usize, // Acts like a program counter
+    state: State, // Acts like a program counter
     program: TuringProgram,
     delay: Duration,
     debug_mode: bool,
@@ -29,7 +30,7 @@ impl TuringMachine {
         Self {
             tape: TuringTape::new(tape_size_bytes),
             head: 0,
-            state: 0,
+            state: State::default(),
             head_max,
             program,
             delay: Duration::from_millis(0),
@@ -37,6 +38,11 @@ impl TuringMachine {
             current_repeats: 0,
             max_repeat: 100
         }
+    }
+    
+    pub fn with_tape(mut self, tape: TuringTape) -> Self {
+        self.tape = tape;
+        self
     }
 
     pub fn with_debug_mode(mut self, delay: Duration) -> Self {
@@ -83,9 +89,9 @@ impl TuringMachine {
             println!(
                 "Head: {} | q={}, σ={} => q'={}, σ'={}, D={}",
                 self.head,
-                instruction.current_state,
+                instruction.current_state.get(),
                 instruction.get_read_bit_number(),
-                instruction.next_state,
+                instruction.next_state.get(),
                 instruction.get_write_bit_number(),
                 instruction.movement.get_code_string()
             );
@@ -105,7 +111,7 @@ impl TuringMachine {
         true
     }
 
-    pub fn process_instruction(&mut self, instruction: Instruction) -> usize {
+    pub fn process_instruction(&mut self, instruction: Instruction) -> State {
         if instruction.write_bit {
             self.set();
         } else {
@@ -165,9 +171,9 @@ mod tests {
 
     #[test]
     fn test_run_program() {
-        let instruction = Instruction::new(0, false, true)
+        let instruction = Instruction::new(State::new(0), false, true)
             .with_movement(Movement::Right)
-            .with_next_state(0);
+            .with_next_state(State::new(0));
 
         // A simple program which will turn every bit on the tape to 1 till it reaches the end
         let mut program = TuringProgram::default();

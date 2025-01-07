@@ -1,17 +1,18 @@
 use serde::{Deserialize, Serialize};
 use crate::enums::movement::Movement;
+use crate::machine::state::State;
 
 #[derive(Debug, Default, Serialize, Deserialize, Copy, Clone)]
 pub struct Instruction {
-    pub current_state: usize,
+    pub current_state: State,
     pub read_bit: bool,
     pub write_bit: bool,
     pub movement: Movement,
-    pub next_state: usize,
+    pub next_state: State,
 }
 
 impl Instruction {
-    pub fn new(current_state: usize, read_bit: bool, write_bit: bool) -> Self {
+    pub fn new(current_state: State, read_bit: bool, write_bit: bool) -> Self {
         Self {
             current_state,
             read_bit,
@@ -26,7 +27,7 @@ impl Instruction {
         self
     }
     
-    pub fn with_next_state(mut self, next_state: usize) -> Self {
+    pub fn with_next_state(mut self, next_state: State) -> Self {
         self.next_state = next_state;
         self
     }

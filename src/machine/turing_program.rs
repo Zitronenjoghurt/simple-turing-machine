@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use crate::machine::instruction::Instruction;
+use crate::machine::state::State;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct TuringProgram {
-    pub instructions: HashMap<(usize, bool), Instruction>
+    pub instructions: HashMap<(State, bool), Instruction>
 }
 
 impl TuringProgram {
-    pub fn get(&self, state: usize, read_bit: bool) -> Option<&Instruction> {
+    pub fn get(&self, state: State, read_bit: bool) -> Option<&Instruction> {
         self.instructions.get(&(state, read_bit))
     }
     
