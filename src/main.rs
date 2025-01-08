@@ -2,6 +2,7 @@ use std::time::Duration;
 use crate::compiler::layers::primitive::PrimitiveLayer;
 use crate::compiler::layers::program_builder::ProgramBuilder;
 use crate::compiler::turing_compiler::TuringCompiler;
+use crate::enums::display_style::DisplayStyle;
 use crate::machine::turing_machine::TuringMachine;
 use crate::machine::turing_tape::TuringTape;
 
@@ -27,7 +28,7 @@ fn main() {
     
     let mut tm = TuringMachine::new(program, 2)
         .with_tape(manipulated_tape)
-        .with_debug_mode(Duration::from_millis(100));
+        .with_debug_mode(DisplayStyle::VisualFormal, Duration::from_millis(500));
     
     tm.run_program()
 }

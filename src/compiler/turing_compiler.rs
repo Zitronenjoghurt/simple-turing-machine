@@ -30,10 +30,6 @@ impl ProgramBuilder for TuringCompiler {
     fn add_instruction(&mut self, instruction: Instruction) {
         self.program.add_instruction(instruction);
     }
-
-    fn add_instructions(&mut self, instructions: &[Instruction]) {
-        instructions.iter().for_each(|i| self.add_instruction(*i));
-    }
 }
 
 impl PrimitiveLayer for TuringCompiler {}

@@ -1,6 +1,7 @@
 use std::thread::sleep;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use crate::enums::display_style::DisplayStyle;
 use crate::enums::movement::Movement;
 use crate::machine::instruction::Instruction;
 use crate::machine::state::State;
@@ -16,6 +17,7 @@ pub struct TuringMachine {
     program: TuringProgram,
     delay: Duration,
     debug_mode: bool,
+    display_style: DisplayStyle,
     current_repeats: usize,
     max_repeat: usize, // Loop failsafe
 }
@@ -35,6 +37,7 @@ impl TuringMachine {
             program,
             delay: Duration::from_millis(0),
             debug_mode: false,
+            display_style: DisplayStyle::None,
             current_repeats: 0,
             max_repeat: 100
         }
@@ -45,7 +48,8 @@ impl TuringMachine {
         self
     }
 
-    pub fn with_debug_mode(mut self, delay: Duration) -> Self {
+    pub fn with_debug_mode(mut self, display_style: DisplayStyle, delay: Duration) -> Self {
+        self.display_style = display_style;
         self.delay = delay;
         self.debug_mode = true;
         self
@@ -86,15 +90,27 @@ impl TuringMachine {
         };
 
         if self.debug_mode {
-            println!(
-                "Head: {} | q={}, σ={} => q'={}, σ'={}, D={}",
-                self.head,
-                instruction.current_state.get(),
-                instruction.get_read_bit_number(),
-                instruction.next_state.get(),
-                instruction.get_write_bit_number(),
-                instruction.movement.get_code_string()
-            );
+            match self.display_style {
+                DisplayStyle::Formal => {
+                    println!(
+                        "Head: {} | {}",
+                        self.head,
+                        instruction.get_formal_string()
+                    );
+                },
+                DisplayStyle::Visual => {
+                    println!("{}", self.tape.to_string(Some(self.head)))
+                },
+                DisplayStyle::VisualFormal => {
+                    println!(
+                        "{} | Head: {} | {}",
+                        self.tape.to_string(Some(self.head)),
+                        self.head,
+                        instruction.get_formal_string()
+                    )
+                },
+                _ => {}
+            }
         }
 
         let next_state = self.process_instruction(instruction);
@@ -179,9 +195,7 @@ mod tests {
         let mut program = TuringProgram::default();
         program.add_instruction(instruction);
 
-        let mut tm = TuringMachine::new(program, 2)
-            .with_debug_mode(Duration::from_millis(0));
-        
+        let mut tm = TuringMachine::new(program, 2);
         tm.run_program();
         
         tm.head = 0;

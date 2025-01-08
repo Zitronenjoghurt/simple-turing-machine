@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ops::Add;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,6 +44,30 @@ impl TuringTape {
         let byte = &mut self.tape[byte_index];
         *byte &= !(1 << position);
         Ok(())
+    }
+
+    pub fn to_string(&self, marked_index: Option<usize>) -> String {
+        let mut string = String::new();
+        for i in 0..self.size_bytes * 8 {
+            if Some(i) == marked_index {
+                string.push('[');
+            } else {
+                string.push(' ');
+            }
+
+            if self.read(i).unwrap() {
+                string.push('1');
+            } else {
+                string.push('0');
+            }
+
+            if Some(i) == marked_index {
+                string.push(']');
+            } else {
+                string.push(' ');
+            }
+        }
+        string
     }
 }
 

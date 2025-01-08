@@ -47,4 +47,15 @@ impl Instruction {
             0
         }
     }
+
+    pub fn get_formal_string(&self) -> String {
+        format!(
+            "(q={}, σ={}) => (q'={}, σ'={}, D={})",
+            self.current_state.get(),
+            self.get_read_bit_number(),
+            self.next_state.get(),
+            self.get_write_bit_number(),
+            self.movement.get_code_string()
+        )
+    }
 }
