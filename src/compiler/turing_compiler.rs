@@ -1,3 +1,4 @@
+use crate::compiler::layers::base::BaseLayer;
 use crate::compiler::layers::primitive::PrimitiveLayer;
 use crate::compiler::layers::program_builder::ProgramBuilder;
 use crate::machine::instruction::Instruction;
@@ -7,7 +8,7 @@ use crate::machine::turing_program::TuringProgram;
 #[derive(Debug, Default)]
 pub struct TuringCompiler {
     current_state: usize,
-    program: TuringProgram
+    program: TuringProgram,
 }
 
 impl TuringCompiler {
@@ -27,9 +28,14 @@ impl ProgramBuilder for TuringCompiler {
         State::new(usize::MAX)
     }
 
+    fn get_instruction(&self, state: State, read_bit: bool) -> Option<&Instruction> {
+        self.program.get(state, read_bit)
+    }
+
     fn add_instruction(&mut self, instruction: Instruction) {
         self.program.add_instruction(instruction);
     }
 }
 
 impl PrimitiveLayer for TuringCompiler {}
+impl BaseLayer for TuringCompiler {}

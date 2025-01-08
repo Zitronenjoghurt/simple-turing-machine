@@ -4,8 +4,12 @@ use crate::machine::instruction::Instruction;
 use crate::machine::state::State;
 
 pub trait PrimitiveLayer: ProgramBuilder {
-    fn branch(&mut self, current_state: Option<State>, state_marked: State, state_unmarked: State) -> State {
+    /// The given state will transition to state_marked if the current bit is 1 else to state_unmarked.
+    fn branch(&mut self, current_state: Option<State>, state_marked: Option<State>, state_unmarked: Option<State>) -> State {
         let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
+        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
+
         let instruction_0 = Instruction::new(branch_state, false, false)
             .with_next_state(state_unmarked);
         let instruction_1 = Instruction::new(branch_state, true, true)
@@ -15,6 +19,7 @@ pub trait PrimitiveLayer: ProgramBuilder {
         branch_state
     }
 
+    /// The given state will move the head left, then transition to the next state.
     fn move_left(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let move_state = current_state.unwrap_or_else(|| self.allocate_state());
         let next_state = next_state.unwrap_or_else(|| self.allocate_state());
@@ -30,6 +35,7 @@ pub trait PrimitiveLayer: ProgramBuilder {
         (move_state, next_state)
     }
 
+    /// The given state will move the head right, then transition to the next state.
     fn move_right(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let move_state = current_state.unwrap_or_else(|| self.allocate_state());
         let next_state = next_state.unwrap_or_else(|| self.allocate_state());
@@ -44,7 +50,8 @@ pub trait PrimitiveLayer: ProgramBuilder {
         
         (move_state, next_state)
     }
-    
+
+    /// The given state will mark the current bit, then transition to the next state.
     fn mark(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let marking_state = current_state.unwrap_or_else(|| self.allocate_state());
         let next_state = next_state.unwrap_or_else(|| self.allocate_state());
@@ -58,6 +65,7 @@ pub trait PrimitiveLayer: ProgramBuilder {
         (marking_state, next_state)
     }
 
+    /// The given state will unmark the current bit, then transition to the next state.
     fn unmark(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let unmarking_state = current_state.unwrap_or_else(|| self.allocate_state());
         let next_state = next_state.unwrap_or_else(|| self.allocate_state());
@@ -71,6 +79,7 @@ pub trait PrimitiveLayer: ProgramBuilder {
         (unmarking_state, next_state)
     }
     
+    /// The given state will transition to halt.
     fn halt(&mut self, current_state: Option<State>) -> State {
         let new_state = current_state.unwrap_or_else(|| self.allocate_state());
         let halt_state = self.get_halt_state();

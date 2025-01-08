@@ -24,7 +24,6 @@ pub struct TuringMachine {
 
 impl TuringMachine {
     pub fn new(
-        program: TuringProgram,
         tape_size_bytes: usize,
     ) -> Self {
         let head_max = (tape_size_bytes * 8) - 1;
@@ -34,7 +33,7 @@ impl TuringMachine {
             head: 0,
             state: State::default(),
             head_max,
-            program,
+            program: TuringProgram::default(),
             delay: Duration::from_millis(0),
             debug_mode: false,
             display_style: DisplayStyle::None,
@@ -53,6 +52,15 @@ impl TuringMachine {
         self.delay = delay;
         self.debug_mode = true;
         self
+    }
+    
+    pub fn reset_state_persist_tape(&mut self) {
+        self.state = State::default();
+        self.current_repeats = 0;
+    }
+    
+    pub fn set_program(&mut self, program: TuringProgram) {
+        self.program = program;
     }
 
     fn clamp_head(&mut self) {
@@ -85,7 +93,13 @@ impl TuringMachine {
     pub fn program_step(&mut self) -> bool {
         let current_instruction = self.program.get(self.state, self.read());
         let instruction = match current_instruction {
-            None => return false,
+            None => {
+                if self.state.get() == usize::MAX {
+                    return false;
+                } else {
+                    panic!("Dangling state 'q{}'", self.state.get())
+                }
+            },
             Some(inst) => *inst,
         };
 
