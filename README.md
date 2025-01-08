@@ -16,9 +16,9 @@ let move_left_x = compiler.allocate_state();
 let scan_start = compiler.allocate_state();
 let done = compiler.allocate_state();
 
-compiler.move_right_x(x, Some(move_right_x), Some(set_one));
+compiler.move_right_x(13, Some(move_right_x), Some(set_one));
 compiler.mark(Some(set_one), Some(move_left_x));
-compiler.move_left_x(x, Some(move_left_x), Some(scan_start));
+compiler.move_left_x(13, Some(move_left_x), Some(scan_start));
 compiler.scan_simple(true, Movement::Right, Some(scan_start), Some(done));
 compiler.halt(Some(done));
 

@@ -97,7 +97,7 @@ impl TuringMachine {
                 if self.state.get() == usize::MAX {
                     return false;
                 } else {
-                    panic!("Dangling state 'q{}'", self.state.get())
+                    panic!("Dangling state 'q{} σ={}'", self.state.get(), self.read())
                 }
             },
             Some(inst) => *inst,
@@ -172,10 +172,7 @@ mod tests {
 
     #[test]
     fn test_head_functionalities() {
-        let mut tm = TuringMachine::new(
-            TuringProgram::default(),
-            10
-        );
+        let mut tm = TuringMachine::new(10);
 
         assert_eq!(tm.head, 0);
         assert!(!tm.read());
@@ -201,15 +198,21 @@ mod tests {
 
     #[test]
     fn test_run_program() {
-        let instruction = Instruction::new(State::new(0), false, true)
+        let instruction_0 = Instruction::new(State::new(0), false, true)
             .with_movement(Movement::Right)
             .with_next_state(State::new(0));
 
+        let instruction_1 = Instruction::new(State::new(0), true, true)
+            .with_movement(Movement::Right)
+            .with_next_state(State::new(usize::MAX));
+
         // A simple program which will turn every bit on the tape to 1 till it reaches the end
         let mut program = TuringProgram::default();
-        program.add_instruction(instruction);
+        program.add_instruction(instruction_0);
+        program.add_instruction(instruction_1);
 
-        let mut tm = TuringMachine::new(program, 2);
+        let mut tm = TuringMachine::new(2);
+        tm.set_program(program);
         tm.run_program();
         
         tm.head = 0;
