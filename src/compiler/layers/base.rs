@@ -97,12 +97,13 @@ pub trait BaseLayer: PrimitiveLayer {
         (start_loop_state, end_loop_state)
     }
 
-    /// The current state will move the head in the given direction till it finds the given bit, then transition to the next state without moving.
+    /// The current state will move the head in the given direction till it finds the given bit, then transition to the next state.
     /// If the bit is not found this results in an endless loop. Counters are not a thing on this primitive level yet.
     fn scan_single(
         &mut self,
         target_bit: bool,
-        movement: Movement,
+        scan_movement: Movement,
+        final_movement: Movement,
         current_state: Option<State>,
         next_state: Option<State>
     ) -> (State, State) {
@@ -114,16 +115,16 @@ pub trait BaseLayer: PrimitiveLayer {
                 Some(start_state),
                 Some(end_state),
                 Some(start_state),
-                Movement::Stay,
-                movement
+                final_movement,
+                scan_movement
             );
         } else {
             self.branch(
                 Some(start_state),
                 Some(start_state),
                 Some(end_state),
-                movement,
-                Movement::Stay
+                scan_movement,
+                final_movement
             );
         }
         
@@ -205,7 +206,7 @@ mod tests {
         let scan_state = compiler.allocate_state();
         let done = compiler.halt(None);
         
-        compiler.scan_single(true, Movement::Right, Some(scan_state), Some(done));
+        compiler.scan_single(true, Movement::Right, Movement::Stay, Some(scan_state), Some(done));
         
         let mut tape = TuringTape::default();
         tape.set(2763);

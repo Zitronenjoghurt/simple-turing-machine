@@ -39,7 +39,7 @@ fn build_set_bit_x_and_find_it_again(x: usize) -> TuringProgram {
     compiler.move_right_x(x, Some(move_right_x), Some(set_one));
     compiler.mark(Some(set_one), Some(move_left_x));
     compiler.move_left_x(x, Some(move_left_x), Some(scan_start));
-    compiler.scan_single(true, Movement::Right, Some(scan_start), Some(done));
+    compiler.scan_single(true, Movement::Right, Movement::Stay, Some(scan_start), Some(done));
     compiler.halt(Some(done));
 
     compiler.get_program()
