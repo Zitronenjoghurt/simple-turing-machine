@@ -36,6 +36,12 @@ impl TuringMachine {
         self.debug_mode = true;
         self
     }
+
+    pub fn reset_state_information(&mut self) {
+        self.tape = TuringTape::default();
+        self.state = State::default();
+        self.head = 0;
+    }
     
     pub fn reset_state_but_persist_tape(&mut self) {
         self.state = State::default();
@@ -43,6 +49,14 @@ impl TuringMachine {
     
     pub fn set_program(&mut self, program: TuringProgram) {
         self.program = program;
+    }
+
+    pub fn set_tape(&mut self, tape: TuringTape) {
+        self.tape = tape;
+    }
+
+    pub fn set_head(&mut self, head: usize) {
+        self.head = head;
     }
 
     pub fn read(&mut self) -> bool {

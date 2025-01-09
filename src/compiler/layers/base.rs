@@ -10,7 +10,7 @@ pub trait BaseLayer: PrimitiveLayer {
     /// * `n`: How many times the build instruction should be repeated.
     /// * `start_state`: The start state of the loop.
     /// * `end_state`: The end state of the loop.
-    /// * `build_iteration`: A function which takes in a start_state and end_state and returns a start_state and end_state.
+    /// * `build_iteration`: A function which takes in the current iteration count, a start_state and end_state and returns a start_state and end_state.
     ///
     /// returns: (State, State) = The start and end state of the loop
     ///
@@ -31,10 +31,10 @@ pub trait BaseLayer: PrimitiveLayer {
         n: usize,
         start_state: Option<State>,
         end_state: Option<State>,
-        build_iteration: impl Fn(&mut Self, Option<State>, Option<State>) -> (State, State),
+        build_iteration: impl Fn(&mut Self, usize, Option<State>, Option<State>) -> (State, State),
     ) -> (State, State) {
         if n == 1 {
-            return build_iteration(self, start_state, end_state);
+            return build_iteration(self, 0, start_state, end_state);
         }
 
         let mut prev_iter_end: Option<State> = None;
@@ -43,11 +43,11 @@ pub trait BaseLayer: PrimitiveLayer {
 
         for i in 0..n {
             let (iter_start, iter_end) = if i == 0 {
-                build_iteration(self, start_state, None)
+                build_iteration(self, i, start_state, None)
             } else if i == (n-1) {
-                build_iteration(self, prev_iter_end, end_state)
+                build_iteration(self, i, prev_iter_end, end_state)
             } else {
-                build_iteration(self, prev_iter_end, None)
+                build_iteration(self, i, prev_iter_end, None)
             };
 
             if i == 0 {
@@ -72,8 +72,8 @@ pub trait BaseLayer: PrimitiveLayer {
               x,
               Some(start_state),
               Some(end_state),
-              |compiler, iteration_start, iteration_end| {
-                  compiler.move_right(iteration_start, iteration_end)
+              |compiler, _, iter_start, iter_end| {
+                  compiler.move_right(iter_start, iter_end)
               },
          );
 
@@ -89,8 +89,8 @@ pub trait BaseLayer: PrimitiveLayer {
             x,
             Some(start_state),
             Some(end_state),
-            |compiler, iteration_start, iteration_end| {
-                compiler.move_left(iteration_start, iteration_end)
+            |compiler, _, iter_start, iter_end| {
+                compiler.move_left(iter_start, iter_end)
             },
         );
 
@@ -130,6 +130,65 @@ pub trait BaseLayer: PrimitiveLayer {
         
         (start_state, end_state)
     }
+
+    fn branch_when(
+        &mut self,
+        target_bit: bool,
+        next_movement: Movement,
+        else_movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+        else_state: Option<State>
+    ) -> (State, State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let next_state = next_state.unwrap_or_else(|| self.allocate_state());
+        let else_state = else_state.unwrap_or_else(|| self.allocate_state());
+
+        if target_bit {
+            self.branch(
+                Some(start_state),
+                Some(next_state),
+                Some(else_state),
+                next_movement,
+                else_movement
+            );
+        } else {
+            self.branch(
+                Some(start_state),
+                Some(else_state),
+                Some(next_state),
+                else_movement,
+                next_movement
+            );
+        }
+
+        (start_state, next_state, else_state)
+    }
+
+    fn write_and_move(
+        &mut self,
+        target_bit: bool,
+        movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+    ) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        if target_bit {
+            match movement {
+                Movement::Right => self.mark_and_move_right(Some(start_state), Some(end_state)),
+                Movement::Left => self.mark_and_move_left(Some(start_state), Some(end_state)),
+                Movement::Stay => self.mark(Some(start_state), Some(end_state)),
+            }
+        } else {
+            match movement {
+                Movement::Right => self.unmark_and_move_right(Some(start_state), Some(end_state)),
+                Movement::Left => self.unmark_and_move_left(Some(start_state), Some(end_state)),
+                Movement::Stay => self.unmark(Some(start_state), Some(end_state)),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -150,10 +209,10 @@ mod tests {
             3,
             Some(start_state),
             Some(done),
-            |compiler, iteration_start, iteration_end| {
+            |compiler, _, iter_start, iter_end| {
                 let new_state = compiler.allocate_state();
-                compiler.mark(iteration_start, Some(new_state));
-                compiler.unmark(Some(new_state), iteration_end)
+                compiler.mark(iter_start, Some(new_state));
+                compiler.unmark(Some(new_state), iter_end)
             }
         );
         
@@ -213,5 +272,29 @@ mod tests {
         let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
         tm.run_program();
         assert_eq!(tm.head, 2763);
+    }
+
+    #[test]
+    fn test_branch_when() {
+        let mut compiler = TuringCompiler::default();
+        let branch_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.branch_when(
+            false,
+            Movement::Right,
+            Movement::Left,
+            Some(branch_state),
+            Some(branch_state),
+            Some(done),
+        );
+
+        let mut tape = TuringTape::default();
+        tape.set(1);
+        let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
+        tm.program_step();
+        assert_eq!(tm.head, 1);
+        tm.program_step();
+        assert_eq!(tm.head, 0);
     }
 }

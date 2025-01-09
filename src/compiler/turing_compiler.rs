@@ -1,4 +1,5 @@
 use crate::compiler::layers::base::BaseLayer;
+use crate::compiler::layers::pattern::PatternLayer;
 use crate::compiler::layers::primitive::PrimitiveLayer;
 use crate::compiler::layers::program_builder::ProgramBuilder;
 use crate::machine::instruction::Instruction;
@@ -39,3 +40,4 @@ impl ProgramBuilder for TuringCompiler {
 
 impl PrimitiveLayer for TuringCompiler {}
 impl BaseLayer for TuringCompiler {}
+impl PatternLayer for TuringCompiler {}
