@@ -10,34 +10,23 @@ use crate::machine::turing_tape::TuringTape;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TuringMachine {
-    tape: TuringTape,
-    head: usize,
-    state: State, // Acts like a program counter
-    program: TuringProgram,
-    delay: Duration,
-    debug_mode: bool,
-    display_style: DisplayStyle,
-    current_repeats: usize,
-    max_repeat: usize, // Loop failsafe
+    pub tape: TuringTape,
+    pub head: usize,
+    pub state: State, // Acts like a program counter
+    pub program: TuringProgram,
+    pub delay: Duration,
+    pub debug_mode: bool,
+    pub display_style: DisplayStyle,
 }
 
 impl TuringMachine {
-    pub fn new() -> Self {
-        Self {
-            tape: TuringTape::new(),
-            head: 0,
-            state: State::default(),
-            program: TuringProgram::default(),
-            delay: Duration::from_millis(0),
-            debug_mode: false,
-            display_style: DisplayStyle::None,
-            current_repeats: 0,
-            max_repeat: 100
-        }
-    }
-    
     pub fn with_tape(mut self, tape: TuringTape) -> Self {
         self.tape = tape;
+        self
+    }
+
+    pub fn with_program(mut self, program: TuringProgram) -> Self {
+        self.program = program;
         self
     }
 
@@ -48,9 +37,8 @@ impl TuringMachine {
         self
     }
     
-    pub fn reset_state_persist_tape(&mut self) {
+    pub fn reset_state_but_persist_tape(&mut self) {
         self.state = State::default();
-        self.current_repeats = 0;
     }
     
     pub fn set_program(&mut self, program: TuringProgram) {
@@ -120,18 +108,8 @@ impl TuringMachine {
                 _ => {}
             }
         }
-
-        let next_state = self.process_instruction(instruction);
-        if self.state == next_state {
-            self.current_repeats += 1;
-        }
-
-        if self.current_repeats >= self.max_repeat {
-            panic!("Max loop count exceeded")
-        }
-
-        self.state = next_state;
-
+        
+        self.state = self.process_instruction(instruction);
         true
     }
 
@@ -160,13 +138,27 @@ impl TuringMachine {
     }
 }
 
+impl Default for TuringMachine {
+    fn default() -> Self {
+        Self {
+            tape: TuringTape::default(),
+            head: 0,
+            state: State::default(),
+            program: TuringProgram::default(),
+            delay: Duration::from_millis(0),
+            debug_mode: false,
+            display_style: DisplayStyle::None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_head_functionalities() {
-        let mut tm = TuringMachine::new();
+        let mut tm = TuringMachine::default();
 
         assert_eq!(tm.head, 0);
         assert!(!tm.read());
@@ -205,10 +197,10 @@ mod tests {
         program.add_instruction(instruction_0);
         program.add_instruction(instruction_1);
 
-        let mut tape = TuringTape::new();
+        let mut tape = TuringTape::default();
         tape.set(13);
 
-        let mut tm = TuringMachine::new().with_tape(tape);
+        let mut tm = TuringMachine::default().with_tape(tape);
         tm.set_program(program);
         tm.run_program();
         

@@ -1,20 +1,12 @@
 use std::collections::VecDeque;
-use std::error::Error;
-use std::ops::Add;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct TuringTape {
     tape: VecDeque<u8>,
 }
 
 impl TuringTape {
-    pub fn new() -> Self {
-        Self {
-            tape: VecDeque::new(),
-        }
-    }
-
     pub fn allocate_till_bit_index(&mut self, bit_index: usize) {
         let byte_index = bit_index / 8;
         if byte_index >= self.tape.len() {
@@ -93,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_set_unset_read() {
-        let mut tape = TuringTape::new();
+        let mut tape = TuringTape::default();
         tape.set(7);
         tape.set(13);
         tape.set(19);

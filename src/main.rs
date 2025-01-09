@@ -17,15 +17,14 @@ fn main() {
         build_set_bit_x_and_find_it_again(13)
     ];
     
-    let mut tm = TuringMachine::new()
+    let mut tm = TuringMachine::default()
         .with_debug_mode(DisplayStyle::VisualFormal, Duration::from_millis(100));
 
     for program in current_programs {
         tm.set_program(program);
         tm.run_program();
-        tm.reset_state_persist_tape();
+        tm.reset_state_but_persist_tape();
     }
-
 }
 
 fn build_set_bit_x_and_find_it_again(x: usize) -> TuringProgram {
@@ -40,7 +39,7 @@ fn build_set_bit_x_and_find_it_again(x: usize) -> TuringProgram {
     compiler.move_right_x(x, Some(move_right_x), Some(set_one));
     compiler.mark(Some(set_one), Some(move_left_x));
     compiler.move_left_x(x, Some(move_left_x), Some(scan_start));
-    compiler.scan_simple(true, Movement::Right, Some(scan_start), Some(done));
+    compiler.scan_single(true, Movement::Right, Some(scan_start), Some(done));
     compiler.halt(Some(done));
 
     compiler.get_program()
@@ -75,12 +74,15 @@ fn build_move_right_till_one() -> TuringProgram {
     let mut compiler = TuringCompiler::default();
 
     let check_if_marked = compiler.allocate_state();
-    let move_to_next = compiler.allocate_state();
-    let found_mark = compiler.allocate_state();
+    let done = compiler.halt(None);
 
-    compiler.branch(Some(check_if_marked), Some(found_mark), Some(move_to_next));
-    compiler.move_right(Some(move_to_next), Some(check_if_marked));
-    compiler.halt(Some(found_mark));
+    compiler.branch(
+        Some(check_if_marked), 
+        Some(done), 
+        Some(check_if_marked), 
+        Movement::Stay, 
+        Movement::Right
+    );
 
     compiler.get_program()
 }

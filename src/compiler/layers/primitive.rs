@@ -4,21 +4,6 @@ use crate::machine::instruction::Instruction;
 use crate::machine::state::State;
 
 pub trait PrimitiveLayer: ProgramBuilder {
-    /// The given state will transition to state_marked if the current bit is 1 else to state_unmarked.
-    fn branch(&mut self, current_state: Option<State>, state_marked: Option<State>, state_unmarked: Option<State>) -> State {
-        let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
-        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
-        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
-
-        let instruction_0 = Instruction::new(branch_state, false, false)
-            .with_next_state(state_unmarked);
-        let instruction_1 = Instruction::new(branch_state, true, true)
-            .with_next_state(state_marked);
-        self.add_instructions(&[instruction_0, instruction_1]);
-        
-        branch_state
-    }
-
     /// The given state will move the head left, then transition to the next state.
     fn move_left(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let move_state = current_state.unwrap_or_else(|| self.allocate_state());
@@ -49,6 +34,30 @@ pub trait PrimitiveLayer: ProgramBuilder {
         self.add_instructions(&[instruction_0, instruction_1]);
         
         (move_state, next_state)
+    }
+
+    /// The given state will transition to state_marked if the current bit is 1 else to state_unmarked.
+    fn branch(
+        &mut self,
+        current_state: Option<State>,
+        state_marked: Option<State>,
+        state_unmarked: Option<State>,
+        movement_marked: Movement,
+        movement_unmarked: Movement
+    ) -> State {
+        let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
+        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
+
+        let instruction_0 = Instruction::new(branch_state, false, false)
+            .with_next_state(state_unmarked)
+            .with_movement(movement_unmarked);
+        let instruction_1 = Instruction::new(branch_state, true, true)
+            .with_next_state(state_marked)
+            .with_movement(movement_marked);
+        self.add_instructions(&[instruction_0, instruction_1]);
+
+        branch_state
     }
 
     /// The given state will mark the current bit, then transition to the next state.
@@ -91,5 +100,111 @@ pub trait PrimitiveLayer: ProgramBuilder {
         self.add_instructions(&[instruction_0, instruction_1]);
         
         new_state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::compiler::turing_compiler::TuringCompiler;
+    use crate::machine::turing_machine::TuringMachine;
+    use crate::machine::turing_tape::TuringTape;
+    use super::*;
+
+    #[test]
+    fn test_move_left() {
+        let mut compiler = TuringCompiler::default();
+
+        let move_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+        compiler.move_left(Some(move_state), Some(done));
+
+        let mut tm = TuringMachine::default().with_program(compiler.get_program());
+        tm.run_program();
+
+        assert_eq!(tm.head, 7);
+    }
+
+    #[test]
+    fn test_move_right() {
+        let mut compiler = TuringCompiler::default();
+
+        let move_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+        compiler.move_right(Some(move_state), Some(done));
+
+        let mut tm = TuringMachine::default().with_program(compiler.get_program());
+        tm.run_program();
+
+        assert_eq!(tm.head, 1);
+    }
+
+    #[test]
+    fn test_branch() {
+        let mut compiler = TuringCompiler::default();
+
+        let check_if_one = compiler.allocate_state();
+        let move_left = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.branch(
+            Some(check_if_one),
+            Some(move_left),
+            Some(check_if_one),
+            Movement::Left,
+            Movement::Right,
+        );
+
+        compiler.move_left(Some(move_left), Some(done));
+
+        let mut tape = TuringTape::default();
+        tape.set(5);
+
+        let mut tm = TuringMachine::default()
+            .with_program(compiler.get_program())
+            .with_tape(tape);
+        tm.program_step();
+        assert_eq!(tm.head, 1);
+        tm.program_step();
+        assert_eq!(tm.head, 2);
+        tm.program_step();
+        assert_eq!(tm.head, 3);
+        tm.program_step();
+        assert_eq!(tm.head, 4);
+        tm.program_step();
+        assert_eq!(tm.head, 5);
+        tm.program_step();
+        assert_eq!(tm.head, 4);
+        tm.program_step();
+        assert_eq!(tm.head, 3);
+    }
+
+    #[test]
+    fn test_mark() {
+        let mut compiler = TuringCompiler::default();
+        let mark_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.mark(Some(mark_state), Some(done));
+
+        let mut tm = TuringMachine::default().with_program(compiler.get_program());
+        tm.run_program();
+        assert_eq!(tm.head, 0);
+        assert!(tm.read());
+    }
+    
+    #[test]
+    fn test_unmark() {
+        let mut compiler = TuringCompiler::default();
+        let mark_state = compiler.allocate_state();
+        let unmark_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+        
+        compiler.mark(Some(mark_state), Some(unmark_state));
+        compiler.unmark(Some(unmark_state), Some(done));
+        
+        let mut tm = TuringMachine::default().with_program(compiler.get_program());
+        tm.run_program();
+        assert_eq!(tm.head, 0);
+        assert!(!tm.read());
     }
 }
