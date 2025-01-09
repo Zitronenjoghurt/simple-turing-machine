@@ -17,7 +17,7 @@ fn main() {
         build_set_bit_x_and_find_it_again(13)
     ];
     
-    let mut tm = TuringMachine::new(2)
+    let mut tm = TuringMachine::new()
         .with_debug_mode(DisplayStyle::VisualFormal, Duration::from_millis(100));
 
     for program in current_programs {

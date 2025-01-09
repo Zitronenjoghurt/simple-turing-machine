@@ -12,7 +12,6 @@ use crate::machine::turing_tape::TuringTape;
 pub struct TuringMachine {
     tape: TuringTape,
     head: usize,
-    head_max: usize,
     state: State, // Acts like a program counter
     program: TuringProgram,
     delay: Duration,
@@ -23,16 +22,11 @@ pub struct TuringMachine {
 }
 
 impl TuringMachine {
-    pub fn new(
-        tape_size_bytes: usize,
-    ) -> Self {
-        let head_max = (tape_size_bytes * 8) - 1;
-
+    pub fn new() -> Self {
         Self {
-            tape: TuringTape::new(tape_size_bytes),
+            tape: TuringTape::new(),
             head: 0,
             state: State::default(),
-            head_max,
             program: TuringProgram::default(),
             delay: Duration::from_millis(0),
             debug_mode: false,
@@ -63,35 +57,35 @@ impl TuringMachine {
         self.program = program;
     }
 
-    fn clamp_head(&mut self) {
-        if self.head > self.head_max {
-            self.head = self.head_max;
-        }
-    }
-
-    pub fn read(&self) -> bool {
-        self.tape.read(self.head).unwrap()
+    pub fn read(&mut self) -> bool {
+        self.tape.read(self.head)
     }
 
     pub fn set(&mut self) {
-        self.tape.set(self.head).unwrap()
+        self.tape.set(self.head)
     }
 
     pub fn unset(&mut self) {
-        self.tape.unset(self.head).unwrap()
+        self.tape.unset(self.head)
     }
 
     pub fn move_right(&mut self) {
         self.head += 1;
-        self.clamp_head();
+        self.tape.allocate_till_bit_index(self.head);
     }
 
     pub fn move_left(&mut self) {
-        self.head = self.head.saturating_sub(1);
+        if self.head == 0 {
+            self.head = 7;
+            self.tape.allocate_left(1);
+        } else {
+            self.head -= 1;
+        }
     }
 
     pub fn program_step(&mut self) -> bool {
-        let current_instruction = self.program.get(self.state, self.read());
+        let current_bit = self.read();
+        let current_instruction = self.program.get(self.state, current_bit);
         let instruction = match current_instruction {
             None => {
                 if self.state.get() == usize::MAX {
@@ -113,12 +107,12 @@ impl TuringMachine {
                     );
                 },
                 DisplayStyle::Visual => {
-                    println!("{}", self.tape.to_string(Some(self.head)))
+                    println!("{}", self.tape.get_string(Some(self.head)))
                 },
                 DisplayStyle::VisualFormal => {
                     println!(
                         "{} | Head: {} | {}",
-                        self.tape.to_string(Some(self.head)),
+                        self.tape.get_string(Some(self.head)),
                         self.head,
                         instruction.get_formal_string()
                     )
@@ -172,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_head_functionalities() {
-        let mut tm = TuringMachine::new(10);
+        let mut tm = TuringMachine::new();
 
         assert_eq!(tm.head, 0);
         assert!(!tm.read());
@@ -192,33 +186,33 @@ mod tests {
         tm.set();
 
         tm.move_left();
-        assert_eq!(tm.head, 0);
-        assert!(tm.read());
+        assert_eq!(tm.head, 7);
+        assert!(!tm.read());
     }
 
     #[test]
     fn test_run_program() {
-        let instruction_0 = Instruction::new(State::new(0), false, true)
+        let instruction_0 = Instruction::new(State::new(0), false, false)
             .with_movement(Movement::Right)
             .with_next_state(State::new(0));
 
         let instruction_1 = Instruction::new(State::new(0), true, true)
-            .with_movement(Movement::Right)
+            .with_movement(Movement::Stay)
             .with_next_state(State::new(usize::MAX));
 
-        // A simple program which will turn every bit on the tape to 1 till it reaches the end
+        // A simple program which will search for the first 1 on the tape
         let mut program = TuringProgram::default();
         program.add_instruction(instruction_0);
         program.add_instruction(instruction_1);
 
-        let mut tm = TuringMachine::new(2);
+        let mut tape = TuringTape::new();
+        tape.set(13);
+
+        let mut tm = TuringMachine::new().with_tape(tape);
         tm.set_program(program);
         tm.run_program();
         
-        tm.head = 0;
-        for _ in 0..=15 {
-            assert!(tm.read());
-            tm.move_right();
-        }
+        assert!(tm.read());
+        assert_eq!(tm.head, 13);
     }
 }
