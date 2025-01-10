@@ -1,7 +1,9 @@
 use std::time::Duration;
 use crate::compiler::layers::base::BaseLayer;
+use crate::compiler::layers::pattern::PatternLayer;
 use crate::compiler::layers::primitive::PrimitiveLayer;
 use crate::compiler::layers::program_builder::ProgramBuilder;
+use crate::compiler::structures::pattern::Pattern;
 use crate::compiler::turing_compiler::TuringCompiler;
 use crate::enums::display_style::DisplayStyle;
 use crate::enums::movement::Movement;
@@ -14,7 +16,7 @@ mod compiler;
 
 fn main() {
     let current_programs = [
-        build_set_bit_x_and_find_it_again(13)
+        build_mark_start_do_stuff_find_start()
     ];
     
     let mut tm = TuringMachine::default()
@@ -25,6 +27,25 @@ fn main() {
         tm.run_program();
         tm.reset_state_but_persist_tape();
     }
+}
+
+fn build_mark_start_do_stuff_find_start() -> TuringProgram {
+    let start_pattern = Pattern::new(vec![true, true, false, true, true, false, true, true, false, true, true]);
+    
+    let mut compiler = TuringCompiler::default();
+    
+    let mark_start = compiler.allocate_state();
+    let move_away = compiler.allocate_state();
+    let mark_other_pattern = compiler.allocate_state();
+    let find_start = compiler.allocate_state();
+    let done = compiler.halt(None);
+    
+    compiler.write_pattern(start_pattern.clone(), Movement::Right, Movement::Right, Some(mark_start), Some(move_away));
+    compiler.move_right_x(4, Some(move_away), Some(mark_other_pattern));
+    compiler.write_pattern(Pattern::new(vec![true, true, false, true]), Movement::Right, Movement::Stay, Some(mark_other_pattern), Some(find_start));
+    compiler.scan_pattern(start_pattern, Movement::Left, Movement::Stay, Some(find_start), Some(done));
+    
+    compiler.get_program()
 }
 
 fn build_set_bit_x_and_find_it_again(x: usize) -> TuringProgram {

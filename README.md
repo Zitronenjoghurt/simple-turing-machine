@@ -143,3 +143,65 @@ compiler.get_program()
  0  0  0  0  0  0  0  0  0  0  0  0  0 [1] 0  0  | Head: 13 | (q=3, σ=1) => (q'=4, σ'=1, D=S)
  0  0  0  0  0  0  0  0  0  0  0  0  0 [1] 0  0  | Head: 13 | (q=4, σ=1) => (q'=18446744073709551615, σ'=1, D=S)
 ```
+
+## Mark start with a pattern, do some stuff to the right, go back to the start
+This is really cool because the turing machine itself has no idea where it's head actually is. Additionally to that, the tape is infinite in both directions left and right, so going back to a specific location on the tape is a non-trivial task, especially without counters or other high-level features (yet).
+```rust
+let start_pattern = Pattern::new(vec![true, true, false, true, true, false, true, true, false, true, true]);
+    
+let mut compiler = TuringCompiler::default();
+
+let mark_start = compiler.allocate_state();
+let move_away = compiler.allocate_state();
+let mark_other_pattern = compiler.allocate_state();
+let find_start = compiler.allocate_state();
+let done = compiler.halt(None);
+
+compiler.write_pattern(start_pattern.clone(), Movement::Right, Movement::Right, Some(mark_start), Some(move_away));
+compiler.move_right_x(4, Some(move_away), Some(mark_other_pattern));
+compiler.write_pattern(Pattern::new(vec![true, true, false, true]), Movement::Right, Movement::Stay, Some(mark_other_pattern), Some(find_start));
+compiler.scan_pattern(start_pattern, Movement::Left, Movement::Stay, Some(find_start), Some(done));
+
+compiler.get_program()
+```
+```
+[0] 0  0  0  0  0  0  0  | Head: 0 | (q=0, σ=0) => (q'=5, σ'=1, D=R)
+ 1 [0] 0  0  0  0  0  0  | Head: 1 | (q=5, σ=0) => (q'=6, σ'=1, D=R)
+ 1  1 [0] 0  0  0  0  0  | Head: 2 | (q=6, σ=0) => (q'=7, σ'=0, D=R)
+ 1  1  0 [0] 0  0  0  0  | Head: 3 | (q=7, σ=0) => (q'=8, σ'=1, D=R)
+ 1  1  0  1 [0] 0  0  0  | Head: 4 | (q=8, σ=0) => (q'=9, σ'=1, D=R)
+ 1  1  0  1  1 [0] 0  0  | Head: 5 | (q=9, σ=0) => (q'=10, σ'=0, D=R)
+ 1  1  0  1  1  0 [0] 0  | Head: 6 | (q=10, σ=0) => (q'=11, σ'=1, D=R)
+ 1  1  0  1  1  0  1 [0] | Head: 7 | (q=11, σ=0) => (q'=12, σ'=1, D=R)
+ 1  1  0  1  1  0  1  1 [0] 0  0  0  0  0  0  0  | Head: 8 | (q=12, σ=0) => (q'=13, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0 [0] 0  0  0  0  0  0  | Head: 9 | (q=13, σ=0) => (q'=14, σ'=1, D=R)
+ 1  1  0  1  1  0  1  1  0  1 [0] 0  0  0  0  0  | Head: 10 | (q=14, σ=0) => (q'=1, σ'=1, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1 [0] 0  0  0  0  | Head: 11 | (q=1, σ=0) => (q'=15, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0 [0] 0  0  0  | Head: 12 | (q=15, σ=0) => (q'=16, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0 [0] 0  0  | Head: 13 | (q=16, σ=0) => (q'=17, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0 [0] 0  | Head: 14 | (q=17, σ=0) => (q'=2, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0 [0] | Head: 15 | (q=2, σ=0) => (q'=18, σ'=1, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1 [0] 0  0  0  0  0  0  0  | Head: 16 | (q=18, σ=0) => (q'=19, σ'=1, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1 [0] 0  0  0  0  0  0  | Head: 17 | (q=19, σ=0) => (q'=20, σ'=0, D=R)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1  0 [0] 0  0  0  0  0  | Head: 18 | (q=20, σ=0) => (q'=3, σ'=1, D=S)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1  0 [1] 0  0  0  0  0  | Head: 18 | (q=3, σ=1) => (q'=21, σ'=1, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1 [0] 1  0  0  0  0  0  | Head: 17 | (q=21, σ=0) => (q'=3, σ'=0, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0  1 [1] 0  1  0  0  0  0  0  | Head: 16 | (q=3, σ=1) => (q'=21, σ'=1, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0  0 [1] 1  0  1  0  0  0  0  0  | Head: 15 | (q=21, σ=1) => (q'=22, σ'=1, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0  0 [0] 1  1  0  1  0  0  0  0  0  | Head: 14 | (q=22, σ=0) => (q'=23, σ'=0, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0  0 [0] 0  1  1  0  1  0  0  0  0  0  | Head: 13 | (q=23, σ=0) => (q'=3, σ'=0, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1  0 [0] 0  0  1  1  0  1  0  0  0  0  0  | Head: 12 | (q=3, σ=0) => (q'=3, σ'=0, D=L)
+ 1  1  0  1  1  0  1  1  0  1  1 [0] 0  0  0  1  1  0  1  0  0  0  0  0  | Head: 11 | (q=3, σ=0) => (q'=3, σ'=0, D=L)
+ 1  1  0  1  1  0  1  1  0  1 [1] 0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 10 | (q=3, σ=1) => (q'=21, σ'=1, D=L)
+ 1  1  0  1  1  0  1  1  0 [1] 1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 9 | (q=21, σ=1) => (q'=22, σ'=1, D=L)
+ 1  1  0  1  1  0  1  1 [0] 1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 8 | (q=22, σ=0) => (q'=23, σ'=0, D=L)
+ 1  1  0  1  1  0  1 [1] 0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 7 | (q=23, σ=1) => (q'=24, σ'=1, D=L)
+ 1  1  0  1  1  0 [1] 1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 6 | (q=24, σ=1) => (q'=25, σ'=1, D=L)
+ 1  1  0  1  1 [0] 1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 5 | (q=25, σ=0) => (q'=26, σ'=0, D=L)
+ 1  1  0  1 [1] 0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 4 | (q=26, σ=1) => (q'=27, σ'=1, D=L)
+ 1  1  0 [1] 1  0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 3 | (q=27, σ=1) => (q'=28, σ'=1, D=L)
+ 1  1 [0] 1  1  0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 2 | (q=28, σ=0) => (q'=29, σ'=0, D=L)
+ 1 [1] 0  1  1  0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 1 | (q=29, σ=1) => (q'=30, σ'=1, D=L)
+[1] 1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 0 | (q=30, σ=1) => (q'=4, σ'=1, D=S)
+[1] 1  0  1  1  0  1  1  0  1  1  0  0  0  0  1  1  0  1  0  0  0  0  0  | Head: 0 | (q=4, σ=1) => (q'=18446744073709551615, σ'=1, D=S)
+```
