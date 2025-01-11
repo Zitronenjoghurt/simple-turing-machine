@@ -97,6 +97,14 @@ pub trait BaseLayer: PrimitiveLayer {
         (start_loop_state, end_loop_state)
     }
 
+    fn move_in_direction(&mut self, movement: Movement, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
+        match movement {
+            Movement::Right => self.move_right(current_state, next_state),
+            Movement::Left => self.move_left(current_state, next_state),
+            Movement::Stay => self.idle(current_state, next_state),
+        }
+    }
+
     /// The current state will move the head in the given direction till it finds the given bit, then transition to the next state.
     /// If the bit is not found this results in an endless loop. Counters are not a thing on this primitive level yet.
     fn scan_single(
@@ -111,7 +119,7 @@ pub trait BaseLayer: PrimitiveLayer {
         let end_state = next_state.unwrap_or_else(|| self.allocate_state());
 
         if target_bit {
-            self.branch(
+            self.branch_move(
                 Some(start_state),
                 Some(end_state),
                 Some(start_state),
@@ -119,7 +127,7 @@ pub trait BaseLayer: PrimitiveLayer {
                 scan_movement
             );
         } else {
-            self.branch(
+            self.branch_move(
                 Some(start_state),
                 Some(start_state),
                 Some(end_state),
@@ -145,7 +153,7 @@ pub trait BaseLayer: PrimitiveLayer {
         let else_state = else_state.unwrap_or_else(|| self.allocate_state());
 
         if target_bit {
-            self.branch(
+            self.branch_move(
                 Some(start_state),
                 Some(next_state),
                 Some(else_state),
@@ -153,7 +161,7 @@ pub trait BaseLayer: PrimitiveLayer {
                 else_movement
             );
         } else {
-            self.branch(
+            self.branch_move(
                 Some(start_state),
                 Some(else_state),
                 Some(next_state),
@@ -188,6 +196,121 @@ pub trait BaseLayer: PrimitiveLayer {
                 Movement::Stay => self.unmark(Some(start_state), Some(end_state)),
             }
         }
+    }
+
+    fn or(
+        &mut self,
+        movement: Movement,
+        final_movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+    ) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        let read_0 = self.allocate_state();
+        let read_1 = self.allocate_state();
+        let result_0 = self.allocate_state();
+        let result_1 = self.allocate_state();
+
+        self.branch_move(Some(start_state), Some(read_1), Some(read_0), movement, movement);
+        self.branch_move(Some(read_0), Some(result_1), Some(result_0), movement, movement);
+        self.move_in_direction(movement, Some(read_1), Some(result_1));
+        self.write_and_move(false, final_movement, Some(result_0), Some(end_state));
+        self.write_and_move(true, final_movement, Some(result_1), Some(end_state));
+
+        (start_state, end_state)
+    }
+
+    fn and(
+        &mut self,
+        movement: Movement,
+        final_movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+    ) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        let read_0 = self.allocate_state();
+        let read_1 = self.allocate_state();
+        let result_0 = self.allocate_state();
+        let result_1 = self.allocate_state();
+
+        self.branch_move(Some(start_state), Some(read_1), Some(read_0), movement, movement);
+        self.move_in_direction(movement, Some(read_0), Some(result_0));
+        self.branch_move(Some(read_1), Some(result_1), Some(result_0), movement, movement);
+        self.write_and_move(false, final_movement, Some(result_0), Some(end_state));
+        self.write_and_move(true, final_movement, Some(result_1), Some(end_state));
+
+        (start_state, end_state)
+    }
+
+    fn xor(
+        &mut self,
+        movement: Movement,
+        final_movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+    ) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        let read_0 = self.allocate_state();
+        let read_1 = self.allocate_state();
+        let result_0 = self.allocate_state();
+        let result_1 = self.allocate_state();
+
+        self.branch_move(Some(start_state), Some(read_1), Some(read_0), movement, movement);
+        self.branch_move(Some(read_0), Some(result_1), Some(result_0), movement, movement);
+        self.branch_move(Some(read_1), Some(result_0), Some(result_1), movement, movement);
+        self.write_and_move(false, final_movement, Some(result_0), Some(end_state));
+        self.write_and_move(true, final_movement, Some(result_1), Some(end_state));
+
+        (start_state, end_state)
+    }
+
+    /// Layout on the tape:
+    /// |prev_carry|n1_1st_bit|n2_1st_bit|result_1st_bit|next_carry/prev_carry|n1_2nd_bit|...
+    /// To be chained together the final movement has to be a stay, that way the next_carry will be the prev_carry of the following add.
+    fn add(
+        &mut self,
+        movement: Movement,
+        final_movement: Movement,
+        current_state: Option<State>,
+        next_state: Option<State>,
+    ) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        let pc0 = self.allocate_state();
+        let pc1 = self.allocate_state();
+        let pc0_n0 = self.allocate_state();
+        let pc0_n1 = self.allocate_state();
+        let pc1_n0 = self.allocate_state();
+        let pc1_n1 = self.allocate_state();
+        let r0_c0 = self.allocate_state();
+        let r0_c1 = self.allocate_state();
+        let r1_c0 = self.allocate_state();
+        let r1_c1 = self.allocate_state();
+        let c0 = self.allocate_state();
+        let c1 = self.allocate_state();
+
+        self.branch_move(Some(start_state), Some(pc1), Some(pc0), movement, movement);
+        self.branch_move(Some(pc0), Some(pc0_n1), Some(pc0_n0), movement, movement);
+        self.branch_move(Some(pc1), Some(pc1_n1), Some(pc1_n0), movement, movement);
+        self.branch_move(Some(pc0_n0), Some(r1_c0), Some(r0_c0), movement, movement);
+        self.branch_move(Some(pc0_n1), Some(r0_c1), Some(r1_c0), movement, movement);
+        self.branch_move(Some(pc1_n0), Some(r0_c1), Some(r1_c0), movement, movement);
+        self.branch_move(Some(pc1_n1), Some(r1_c1), Some(r0_c1), movement, movement);
+        self.write_and_move(false, movement, Some(r0_c0), Some(c0));
+        self.write_and_move(false, movement, Some(r0_c1), Some(c1));
+        self.write_and_move(true, movement, Some(r1_c0), Some(c0));
+        self.write_and_move(true, movement, Some(r1_c1), Some(c1));
+        self.write_and_move(false, final_movement, Some(c0), Some(end_state));
+        self.write_and_move(true, final_movement, Some(c1), Some(end_state));
+
+        (start_state, end_state)
     }
 }
 
@@ -296,5 +419,201 @@ mod tests {
         assert_eq!(tm.head, 1);
         tm.program_step();
         assert_eq!(tm.head, 0);
+    }
+
+    #[test]
+    fn test_or() {
+        let mut compiler = TuringCompiler::default();
+
+        let start_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.chained_loop(
+            4,
+            Some(start_state),
+            Some(done),
+            |compiler, _, iter_start, iter_end| {
+                compiler.or(Movement::Right, Movement::Right, iter_start, iter_end)
+            }
+        );
+
+        // Basically a truth table of the inputs, just unrolled on the tape
+        let mut tape = TuringTape::default();
+        tape.set(3);
+        tape.set(7);
+        tape.set(9);
+        tape.set(10);
+        let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
+        tm.run_program();
+
+        assert!(!tm.tape.read(0));
+        assert!(!tm.tape.read(1));
+        assert!(!tm.tape.read(2));
+        assert!(tm.tape.read(3));
+        assert!(!tm.tape.read(4));
+        assert!(tm.tape.read(5));
+        assert!(!tm.tape.read(6));
+        assert!(tm.tape.read(7));
+        assert!(tm.tape.read(8));
+        assert!(tm.tape.read(9));
+        assert!(tm.tape.read(10));
+        assert!(tm.tape.read(11));
+        assert_eq!(tm.head, 12);
+    }
+
+    #[test]
+    fn test_and() {
+        let mut compiler = TuringCompiler::default();
+
+        let start_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.chained_loop(
+            4,
+            Some(start_state),
+            Some(done),
+            |compiler, _, iter_start, iter_end| {
+                compiler.and(Movement::Right, Movement::Right, iter_start, iter_end)
+            }
+        );
+
+        // Basically a truth table of the inputs, just unrolled on the tape
+        let mut tape = TuringTape::default();
+        tape.set(3);
+        tape.set(7);
+        tape.set(9);
+        tape.set(10);
+        let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
+        tm.run_program();
+
+        assert!(!tm.tape.read(0));
+        assert!(!tm.tape.read(1));
+        assert!(!tm.tape.read(2));
+        assert!(tm.tape.read(3));
+        assert!(!tm.tape.read(4));
+        assert!(!tm.tape.read(5));
+        assert!(!tm.tape.read(6));
+        assert!(tm.tape.read(7));
+        assert!(!tm.tape.read(8));
+        assert!(tm.tape.read(9));
+        assert!(tm.tape.read(10));
+        assert!(tm.tape.read(11));
+        assert_eq!(tm.head, 12);
+    }
+
+    #[test]
+    fn test_xor() {
+        let mut compiler = TuringCompiler::default();
+
+        let start_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.chained_loop(
+            4,
+            Some(start_state),
+            Some(done),
+            |compiler, _, iter_start, iter_end| {
+                compiler.xor(Movement::Right, Movement::Right, iter_start, iter_end)
+            }
+        );
+
+        // Basically a truth table of the inputs, just unrolled on the tape
+        let mut tape = TuringTape::default();
+        tape.set(3);
+        tape.set(7);
+        tape.set(9);
+        tape.set(10);
+        let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
+        tm.run_program();
+
+        assert!(!tm.tape.read(0));
+        assert!(!tm.tape.read(1));
+        assert!(!tm.tape.read(2));
+        assert!(tm.tape.read(3));
+        assert!(!tm.tape.read(4));
+        assert!(tm.tape.read(5));
+        assert!(!tm.tape.read(6));
+        assert!(tm.tape.read(7));
+        assert!(tm.tape.read(8));
+        assert!(tm.tape.read(9));
+        assert!(tm.tape.read(10));
+        assert!(!tm.tape.read(11));
+        assert_eq!(tm.head, 12);
+    }
+
+    #[test]
+    fn test_add() {
+        let mut compiler = TuringCompiler::default();
+
+        let start_state = compiler.allocate_state();
+        let done = compiler.halt(None);
+
+        compiler.chained_loop(
+            8,
+            Some(start_state),
+            Some(done),
+            |compiler, _, iter_start, iter_end| {
+                compiler.add(Movement::Right, Movement::Right, iter_start, iter_end)
+            }
+        );
+
+        // Basically a truth table of the inputs, just unrolled on the tape
+        let mut tape = TuringTape::default();
+        tape.set(5);
+        tape.set(11);
+        tape.set(15);
+        tape.set(16);
+        tape.set(22);
+        tape.set(25);
+        tape.set(27);
+        tape.set(31);
+        tape.set(32);
+        tape.set(35);
+        tape.set(36);
+        tape.set(37);
+        let mut tm = TuringMachine::default().with_program(compiler.get_program()).with_tape(tape);
+        tm.run_program();
+
+        assert!(!tm.tape.read(0));
+        assert!(!tm.tape.read(1));
+        assert!(!tm.tape.read(2));
+        assert!(!tm.tape.read(3));
+        assert!(!tm.tape.read(4));
+        assert!(tm.tape.read(5));
+        assert!(!tm.tape.read(6));
+        assert!(!tm.tape.read(7));
+        assert!(tm.tape.read(8));
+        assert!(!tm.tape.read(9));
+        assert!(!tm.tape.read(10));
+        assert!(tm.tape.read(11));
+        assert!(!tm.tape.read(12));
+        assert!(tm.tape.read(13));
+        assert!(!tm.tape.read(14));
+        assert!(tm.tape.read(15));
+        assert!(tm.tape.read(16));
+        assert!(!tm.tape.read(17));
+        assert!(!tm.tape.read(18));
+        assert!(tm.tape.read(19));
+        assert!(!tm.tape.read(20));
+        assert!(!tm.tape.read(21));
+        assert!(tm.tape.read(22));
+        assert!(tm.tape.read(23));
+        assert!(!tm.tape.read(24));
+        assert!(tm.tape.read(25));
+        assert!(!tm.tape.read(26));
+        assert!(tm.tape.read(27));
+        assert!(!tm.tape.read(28));
+        assert!(tm.tape.read(29));
+        assert!(!tm.tape.read(30));
+        assert!(tm.tape.read(31));
+        assert!(tm.tape.read(32));
+        assert!(!tm.tape.read(33));
+        assert!(tm.tape.read(34));
+        assert!(tm.tape.read(35));
+        assert!(tm.tape.read(36));
+        assert!(tm.tape.read(37));
+        assert!(tm.tape.read(38));
+        assert!(tm.tape.read(39));
+        assert_eq!(tm.head, 40);
     }
 }

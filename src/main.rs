@@ -97,7 +97,7 @@ fn build_move_right_till_one() -> TuringProgram {
     let check_if_marked = compiler.allocate_state();
     let done = compiler.halt(None);
 
-    compiler.branch(
+    compiler.branch_move(
         Some(check_if_marked), 
         Some(done), 
         Some(check_if_marked), 

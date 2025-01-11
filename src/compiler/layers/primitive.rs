@@ -4,6 +4,19 @@ use crate::machine::instruction::Instruction;
 use crate::machine::state::State;
 
 pub trait PrimitiveLayer: ProgramBuilder {
+    fn idle(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
+        let start_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let end_state = next_state.unwrap_or_else(|| self.allocate_state());
+
+        let instruction_0 = Instruction::new(start_state, false, false)
+            .with_next_state(end_state);
+        let instruction_1 = Instruction::new(start_state, true, true)
+            .with_next_state(end_state);
+        self.add_instructions(&[instruction_0, instruction_1]);
+
+        (start_state, end_state)
+    }
+
     /// The given state will move the head left, then transition to the next state.
     fn move_left(&mut self, current_state: Option<State>, next_state: Option<State>) -> (State, State) {
         let move_state = current_state.unwrap_or_else(|| self.allocate_state());
@@ -42,6 +55,25 @@ pub trait PrimitiveLayer: ProgramBuilder {
         current_state: Option<State>,
         state_marked: Option<State>,
         state_unmarked: Option<State>,
+    ) -> (State, State, State) {
+        let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
+        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
+
+        let instruction_0 = Instruction::new(branch_state, false, false)
+            .with_next_state(state_unmarked);
+        let instruction_1 = Instruction::new(branch_state, true, true)
+            .with_next_state(state_marked);
+        self.add_instructions(&[instruction_0, instruction_1]);
+
+        (branch_state, state_marked, state_unmarked)
+    }
+
+    fn branch_move(
+        &mut self,
+        current_state: Option<State>,
+        state_marked: Option<State>,
+        state_unmarked: Option<State>,
         movement_marked: Movement,
         movement_unmarked: Movement
     ) -> (State, State, State) {
@@ -53,6 +85,53 @@ pub trait PrimitiveLayer: ProgramBuilder {
             .with_next_state(state_unmarked)
             .with_movement(movement_unmarked);
         let instruction_1 = Instruction::new(branch_state, true, true)
+            .with_next_state(state_marked)
+            .with_movement(movement_marked);
+        self.add_instructions(&[instruction_0, instruction_1]);
+
+        (branch_state, state_marked, state_unmarked)
+    }
+
+    fn branch_write(
+        &mut self,
+        current_state: Option<State>,
+        state_marked: Option<State>,
+        state_unmarked: Option<State>,
+        write_marked: bool,
+        write_unmarked: bool,
+    ) -> (State, State, State) {
+        let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
+        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
+
+        let instruction_0 = Instruction::new(branch_state, false, write_unmarked)
+            .with_next_state(state_unmarked);
+        let instruction_1 = Instruction::new(branch_state, true, write_marked)
+            .with_next_state(state_marked);
+        self.add_instructions(&[instruction_0, instruction_1]);
+
+        (branch_state, state_marked, state_unmarked)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn branch_move_write(
+        &mut self,
+        current_state: Option<State>,
+        state_marked: Option<State>,
+        state_unmarked: Option<State>,
+        movement_marked: Movement,
+        movement_unmarked: Movement,
+        write_marked: bool,
+        write_unmarked: bool,
+    ) -> (State, State, State) {
+        let branch_state = current_state.unwrap_or_else(|| self.allocate_state());
+        let state_marked = state_marked.unwrap_or_else(|| self.allocate_state());
+        let state_unmarked = state_unmarked.unwrap_or_else(|| self.allocate_state());
+
+        let instruction_0 = Instruction::new(branch_state, false, write_unmarked)
+            .with_next_state(state_unmarked)
+            .with_movement(movement_unmarked);
+        let instruction_1 = Instruction::new(branch_state, true, write_marked)
             .with_next_state(state_marked)
             .with_movement(movement_marked);
         self.add_instructions(&[instruction_0, instruction_1]);
@@ -199,14 +278,14 @@ mod tests {
     }
 
     #[test]
-    fn test_branch() {
+    fn test_branch_move() {
         let mut compiler = TuringCompiler::default();
 
         let check_if_one = compiler.allocate_state();
         let move_left = compiler.allocate_state();
         let done = compiler.halt(None);
 
-        compiler.branch(
+        compiler.branch_move(
             Some(check_if_one),
             Some(move_left),
             Some(check_if_one),
